@@ -18,7 +18,6 @@ object Build extends Build {
   lazy val twirlApi =
     Project("twirl-api", file("twirl-api"))
       .settings(general: _*)
-      .settings(apiPublishing: _*)
       .settings(
         libraryDependencies ++= Seq(
           commonsLang,
@@ -30,7 +29,6 @@ object Build extends Build {
   lazy val twirlCompiler =
     Project("twirl-compiler", file("twirl-compiler"))
       .settings(general: _*)
-      .settings(publishing: _*)
       //.settings(apiPublishing: _*) // use this to publish to repo.spray.io as well
       .settings(
         libraryDependencies ++= Seq(
@@ -44,7 +42,6 @@ object Build extends Build {
   lazy val sbtTwirl =
     Project("sbt-twirl", file("sbt-twirl"))
       .settings(general: _*)
-      .settings(publishing: _*)
       //.settings(apiPublishing: _*) // use this to publish to repo.spray.io as well
       .settings(
         Keys.sbtPlugin := true
@@ -52,6 +49,10 @@ object Build extends Build {
       )
       .dependsOn(twirlCompiler)
 
+  val artifactoryHost = scala.util.Properties.envOrNone("ARTIFACTORY_HOST") getOrElse(throw new Exception("Please set ARTIFACTORY_HOST ENV"))
+  val artifactoryPath = scala.util.Properties.envOrNone("ARTIFACTORY_PATH") getOrElse(throw new Exception("Please set ARTIFACTORY_PATH ENV"))
+  val artifactoryUsername = scala.util.Properties.envOrNone("ARTIFACTORY_USERNAME") getOrElse(throw new Exception("Please set ARTIFACTORY_USERNAME ENV"))
+  val artifactoryPassword = scala.util.Properties.envOrNone("ARTIFACTORY_PASSWORD") getOrElse(throw new Exception("Please set ARTIFACTORY_PASSWORD ENV"))
 
   lazy val general = seq(
     version               := IO.read(file("sbt-twirl/src/main/resources/twirl-version")).trim,
@@ -64,36 +65,10 @@ object Build extends Build {
     scalacOptions         := Seq("-unchecked", "-deprecation", "-encoding", "utf8"),
     description           := "The Play framework Scala template engine, standalone and packaged as an SBT plugin",
     resolvers             += "typesafe repo" at "http://repo.typesafe.com/typesafe/releases/",
-    scalaVersion          := "2.10.2"
-  )
-
-  lazy val publishing = seq(
-    publishMavenStyle := false,
-    publishTo <<= (version) { version: String =>
-      val scalasbt = "http://scalasbt.artifactoryonline.com/scalasbt/sbt-plugin-"
-      val suffix = if (version.contains("-SNAPSHOT")) "snapshots" else "releases"
-
-      val name = "plugin-" + suffix
-      val url  = scalasbt + suffix
-
-      Some(Resolver.url(name, new URL(url))(Resolver.ivyStylePatterns))
-    }
-  )
-
-  // We publish the api to our own repository
-  lazy val apiPublishing = seq(
+    scalaVersion          := "2.10.2",
     publishMavenStyle := true,
-
-    publishTo <<= version { version =>
-      Some {
-        "spray repo" at {
-          // public uri is repo.spray.io, we use an SSH tunnel to the nexus here
-          "http://localhost:42424/content/repositories/" + {
-            if (version.trim.endsWith("SNAPSHOT")) "snapshots/" else "releases/"
-          }
-        }
-      }
-    }
+    publishTo := Some("Artifactory Realm" at "http://"+artifactoryHost+artifactoryPath),
+    credentials := Seq(Credentials("Artifactory Realm", artifactoryHost, artifactoryUsername, artifactoryPassword))
   )
 
   lazy val noPublishing = seq(
